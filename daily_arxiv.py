@@ -79,13 +79,22 @@ def call_deepseek_api(payload, headers):
     resp.raise_for_status()
     return resp.json()
 
+# =====================================================================
+# [重构] DeepSeek 评估模块 (超详细解析 + 通俗大白话版)
+# =====================================================================
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def call_deepseek_api(payload, headers):
+    resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()
+
 def evaluate_and_rank_with_deepseek(candidates, topic):
     api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key: return candidates[:5]
     if not candidates: return []
 
-    prompt_text = f"你是一个资深的【{topic}】领域AI研究员。请评估以下最新ArXiv论文候选列表。\n"
-    prompt_text += "请根据论文的【创新性、质量、对该领域的相关性和影响力】进行打分(0-100分)，并挑选出最优秀的最多 5 篇论文。\n\n"
+    prompt_text = f"你是一个资深的【{topic}】领域AI研究员与架构师。请评估以下最新ArXiv论文候选列表。\n"
+    prompt_text += "请根据论文的创新性、质量、相关性进行打分(0-100分)，挑选出最优秀的最多 5 篇论文，并针对每一篇进行极度深度的结构化解析。\n\n"
     prompt_text += "候选论文列表：\n"
     
     for paper in candidates:
@@ -95,15 +104,24 @@ def evaluate_and_rank_with_deepseek(candidates, topic):
         prompt_text += f"Comments: {paper.get('comments', '')}\n---\n"
     
     prompt_text += """
-请严格以 JSON 格式输出结果，格式如下：
+请严格以 JSON 格式输出结果，不要有任何多余的Markdown标记（如```json），格式必须如下。
+注意：【深度解析】部分请务必详尽专业，多用数据和专业术语；但【通俗总结】请务必接地气、说人话。
 {
   "top_papers": [
     {
       "id": "此处填写论文ID",
       "score": 95,
-      "ai_summary": "一句话中文锐评核心贡献",
-      "tags": ["Tag1", "Tag2"],  // 生成2-3个英文技术微标签，如 [Sim2Real], [RL]
-      "github_link": "提取文本中的GitHub链接，如果没有必须返回 null"
+      "tags": ["Tag1", "Tag2"],
+      "github_link": "提取文本中的GitHub链接，如果没有必须返回 null",
+      "review": {
+        "type": "一句话定性：属于什么类型、主攻哪个细分方向（请详细说明）",
+        "pain_point": "领域痛点：当前行业/算法现存关键问题是什么（请详细阐述前置背景）",
+        "innovation": "核心创新：只讲最本质1~2个技术突破（请详细解释其实现原理）",
+        "comparison": "相关对比：对标哪些经典算法/前人工作，优势在哪（请给出具体的性能指标提升或核心差异）",
+        "scenario": "落地场景：能直接用在机器人/自动驾驶的哪个具体模块或环节",
+        "advice": "跟进建议：是否值得收藏、复现、嵌入现有项目（给出具有行动指导意义的建议）",
+        "layman_summary": "通俗总结：用大白话向非技术老板或外行解释——这帮人到底搞出了个什么牛逼的东西，解决了什么大麻烦？"
+      }
     }
   ]
 }
@@ -112,15 +130,15 @@ def evaluate_and_rank_with_deepseek(candidates, topic):
     payload = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "你是一个严格的学术机器人。只输出合法的 JSON 字符串。"},
+            {"role": "system", "content": "你是一个严谨的学术助手。你只输出原生纯合法的 JSON 字符串。"},
             {"role": "user", "content": prompt_text}
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.2
+        "temperature": 0.4 # 提升一点温度，让“通俗总结”部分的语言更生动、更具表达力
     }
 
     try:
-        logging.info(f"🧠 调用 DeepSeek 评估 {len(candidates)} 篇 [{topic}] 领域候选论文...")
+        logging.info(f"🧠 调用 DeepSeek 进行深度解析 {len(candidates)} 篇 [{topic}] 领域论文...")
         result_json = call_deepseek_api(payload, headers)
         content = result_json['choices'][0]['message']['content']
         
@@ -130,9 +148,9 @@ def evaluate_and_rank_with_deepseek(candidates, topic):
             for paper in candidates:
                 if paper['paper_key'] == ai_eval.get('id'):
                     paper['ai_score'] = ai_eval.get('score', 0)
-                    paper['ai_summary'] = ai_eval.get('ai_summary', "AI暂无评价")
                     paper['tags'] = ai_eval.get('tags', [])
                     paper['github_link'] = ai_eval.get('github_link')
+                    paper['review'] = ai_eval.get('review', {})
                     final_top_papers.append(paper)
                     break
         return final_top_papers
@@ -141,7 +159,7 @@ def evaluate_and_rank_with_deepseek(candidates, topic):
         return candidates[:5]
 
 # =====================================================================
-# [重构] 飞书富文本推送模块 (支持 Tag 和 GitHub 高亮)
+# [重构] 飞书富文本推送模块 (加入通俗大白话总结版)
 # =====================================================================
 def send_to_feishu(webhook, paper):
     if not webhook: return
@@ -150,21 +168,40 @@ def send_to_feishu(webhook, paper):
     title = paper['title']
     url = paper['url']
     ai_score = paper.get('ai_score', 'N/A')
-    ai_summary = paper.get('ai_summary', '无')
     tags = paper.get('tags', [])
     github_link = paper.get('github_link')
+    review = paper.get('review', {})
     
-    # 构造多彩标签
     tags_str = " ".join([f"**[{t}]**" for t in tags]) if tags else "无"
     
-    # 构建飞书 Markdown
     md_content = f"👤 **作者**: {paper['authors']}\n"
     md_content += f"🏷️ **分类**: {tags_str}\n"
     if github_link and github_link.lower() != "null":
         md_content += f"💻 **开源代码**: [{github_link}]({github_link})\n"
     md_content += f"🔥 **AI 评分**: {ai_score} / 100\n"
-    md_content += f"💡 **AI 锐评**: {ai_summary}\n"
-    md_content += f"🔗 **原件链接**: [{url}]({url})"
+    
+    # 学术硬核深度解析
+    md_content += "\n---\n🔬 **硬核深度解析**\n"
+    r_type = review.get('type', '未提取')
+    r_pain = review.get('pain_point', '未提取')
+    r_inno = review.get('innovation', '未提取')
+    r_comp = review.get('comparison', '未提取')
+    r_scen = review.get('scenario', '未提取')
+    r_adv  = review.get('advice', '未提取')
+    r_layman = review.get('layman_summary', '未提取')
+
+    md_content += f"**🎯 定性**: {r_type}\n\n"
+    md_content += f"**💢 痛点**: {r_pain}\n\n"
+    md_content += f"**✨ 创新**: {r_inno}\n\n"
+    md_content += f"**📊 对比**: {r_comp}\n\n"
+    md_content += f"**🚗 场景**: {r_scen}\n\n"
+    md_content += f"**📌 建议**: {r_adv}\n"
+    
+    # 增加通俗白话总结板块
+    md_content += f"\n---\n🗣️ **通俗大白话总结**\n"
+    md_content += f"> *{r_layman}*\n"
+    
+    md_content += f"\n---\n🔗 **原件链接**: [{url}]({url})"
 
     payload = {
         "msg_type": "interactive",
