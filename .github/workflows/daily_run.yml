@@ -1,0 +1,49 @@
+name: Daily arXiv Feishu Bot
+
+# 触发条件：每天北京时间早上 8:00 执行 (UTC 时间 0:00)
+# 或者在 GitHub 网页上手动点击运行 (workflow_dispatch)
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-daily-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # 获取完整历史以防更新覆盖失败
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Auto-Fetch and Evaluate Script
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          ONLY_TOP_CONF: "True"
+        run: |
+          python daily_arxiv.py
+
+      - name: Commit and Push Updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          # 检查是否有文件改动 (主要是 processed_history.json 和 README.md)
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "chore(auto): daily arxiv update & history append"
+            git push
+          else
+            echo "No changes to commit"
+          fi
