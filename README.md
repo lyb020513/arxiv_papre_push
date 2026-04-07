@@ -15,6 +15,9 @@
     <li><a href=#decision-making>Decision Making</a></li>
     <li><a href=#reinforcement-learning>Reinforcement Learning</a></li>
     <li><a href=#autonomous-driving>Autonomous Driving</a></li>
+    <li><a href=#robot-navigation>Robot Navigation</a></li>
+    <li><a href=#path-planning>Path Planning</a></li>
+    <li><a href=#planning-&-control>Planning & Control</a></li>
   </ol>
 </details>
 
@@ -9191,4 +9194,27 @@
 - 2026-04-02, **PTC-Depth: Pose-Refined Monocular Depth Estimation with Temporal Consistency**, Leezy Han et.al., Paper: [http://arxiv.org/abs/2604.01791](http://arxiv.org/abs/2604.01791), Accepted at CVPR 2026
 - 2026-04-01, **Efficient Equivariant Transformer for Self-Driving Agent Modeling**, Scott Xu et.al., Paper: [http://arxiv.org/abs/2604.01466](http://arxiv.org/abs/2604.01466), CVPR 2026
 - 2026-04-01, **ProOOD: Prototype-Guided Out-of-Distribution 3D Occupancy Prediction**, Yuheng Zhang et.al., Paper: [http://arxiv.org/abs/2604.01081](http://arxiv.org/abs/2604.01081), Accepted to CVPR 2026. The source code is publicly available at https://github.com/7uHeng/ProOOD
+
+## Robot Navigation
+
+| Publish Date | Title | Authors | PDF | Code |
+|:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-03, **STRNet: Visual Navigation with Spatio-Temporal Representation through Dynamic Graph Aggregation**, Hao Ren et.al., Paper: [http://arxiv.org/abs/2604.02829](http://arxiv.org/abs/2604.02829), CVPR2026
+- 2026-04-03, **Residual-Aware Distributionally Robust EKF: Absorbing Linearization Mismatch via Wasserstein Ambiguity**, Minhyuk Jang et.al., Paper: [http://arxiv.org/abs/2604.02749](http://arxiv.org/abs/2604.02749), Submitted to the 2026 65th IEEE Conference on Decision and Control (CDC)
+- 2026-04-03, **Rascene: High-Fidelity 3D Scene Imaging with mmWave Communication Signals**, Kunzhe Song et.al., Paper: [http://arxiv.org/abs/2604.02603](http://arxiv.org/abs/2604.02603), Accepted to CVPR 2026
+- 2026-04-02, **Audio Spatially-Guided Fusion for Audio-Visual Navigation**, Xinyu Zhou et.al., Paper: [http://arxiv.org/abs/2604.02389](http://arxiv.org/abs/2604.02389), Main paper (6 pages). Accepted for publication by the International Joint Conference on Neural Networks (IJCNN 2026)
+
+## Path Planning
+
+| Publish Date | Title | Authors | PDF | Code |
+|:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-02, **Cooperative Detour Planning for Dual-Task Drone Fleets**, Pengbo Zhu et.al., Paper: [http://arxiv.org/abs/2604.02471](http://arxiv.org/abs/2604.02471), Submitted to the 65th IEEE Conference on Decision and Control (CDC 2026)
+- 2026-04-01, **DLWM: Dual Latent World Models enable Holistic Gaussian-centric Pre-training in Autonomous Driving**, Yiyao Zhu et.al., Paper: [http://arxiv.org/abs/2604.00969](http://arxiv.org/abs/2604.00969), Accepted by CVPR 2026
+- 2026-04-01, **Towards Viewpoint-Robust End-to-End Autonomous Driving with 3D Foundation Model Priors**, Hiroki Hashimoto et.al., Paper: [http://arxiv.org/abs/2604.00597](http://arxiv.org/abs/2604.00597), Accepted at CVPR Workshop on Simulation for Autonomous Driving 2026
+
+## Planning & Control
+
+| Publish Date | Title | Authors | PDF | Code |
+|:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-05, **Duality Theory for Non-Markovian Linear Gaussian Models**, Aditya Kudre et.al., Paper: [http://arxiv.org/abs/2604.03909](http://arxiv.org/abs/2604.03909), Submitted to the 65th IEEE Conference on Decision and Control (CDC) 2026
 

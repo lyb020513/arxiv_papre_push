@@ -11,16 +11,28 @@ import requests
 import fitz  # PyMuPDF
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+# =====================================================================
+# 基础配置与日志
+# =====================================================================
 logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 
-github_url = "https://api.github.com/search/repositories"
-arxiv_url = "http://arxiv.org/"
-
 HISTORY_FILE = "processed_history.json"
 ONLY_TOP_CONF = os.getenv("ONLY_TOP_CONF", "True").lower() in ("true", "1", "yes")
 
+# 检查必要环境变量
+def check_env():
+    missing = []
+    if not os.getenv("DEEPSEEK_API_KEY"): missing.append("DEEPSEEK_API_KEY")
+    if not os.getenv("FEISHU_WEBHOOK"): missing.append("FEISHU_WEBHOOK")
+    if missing:
+        logging.warning(f"⚠️ 缺少环境变量: {', '.join(missing)}。脚本将以受限模式运行。")
+    return missing
+
+# =====================================================================
+# 历史记录管理
+# =====================================================================
 def load_history():
     if os.path.exists(HISTORY_FILE):
         try:
@@ -45,44 +57,32 @@ def is_top_conf(comment_text):
     return bool(conf_pattern.search(comment_text))
 
 # =====================================================================
-# [新增] PDF 干货提取模块
+# PDF 解析模块
 # =====================================================================
 def extract_pdf_core_content(pdf_url):
-    """下载并提取论文第一页(Intro)和最后一页(Conclusion)"""
     try:
         pdf_dl_url = pdf_url.replace('abs', 'pdf') + ".pdf"
-        logging.info(f"📄 正在解析 PDF (礼貌延迟3秒防封): {pdf_dl_url}")
-        time.sleep(3) # 防止被 arXiv 拉黑 IP
+        logging.info(f"📄 正在解析 PDF: {pdf_dl_url}")
+        time.sleep(2) # 礼貌延迟
         
-        r = requests.get(pdf_dl_url, timeout=20)
+        r = requests.get(pdf_dl_url, timeout=30)
         r.raise_for_status()
         
-        doc = fitz.open(stream=r.content, filetype="pdf")
-        text = ""
-        if len(doc) > 0:
-            text += f"【Introduction】:\n{doc[0].get_text()[:1500]}\n" # 截取前1500字符防超载
-        if len(doc) > 1:
-            text += f"【Conclusion】:\n{doc[-1].get_text()[-1500:]}\n"
-        doc.close()
-        return text
+        with fitz.open(stream=r.content, filetype="pdf") as doc:
+            text = ""
+            if len(doc) > 0:
+                text += f"【Intro】:\n{doc[0].get_text()[:1200]}\n"
+            if len(doc) > 1:
+                text += f"【Conclusion】:\n{doc[-1].get_text()[-1200:]}\n"
+            return text
     except Exception as e:
-        logging.warning(f"⚠️ PDF解析失败, 回退至摘要模式: {e}")
-        return "PDF解析失败，请仅依赖摘要进行评估。"
+        logging.warning(f"⚠️ PDF解析失败: {e}")
+        return "无法提取PDF正文，请基于摘要评估。"
 
 # =====================================================================
-# [重构] DeepSeek 评估模块 (Tenacity 重试 + 新 Prompt)
+# DeepSeek 评估引擎
 # =====================================================================
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def call_deepseek_api(payload, headers):
-    """封装 API 请求以支持失败自动重试"""
-    resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=40)
-    resp.raise_for_status()
-    return resp.json()
-
-# =====================================================================
-# [重构] DeepSeek 评估模块 (超详细解析 + 通俗大白话版)
-# =====================================================================
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def call_deepseek_api(payload, headers):
     resp = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=60)
     resp.raise_for_status()
@@ -90,37 +90,34 @@ def call_deepseek_api(payload, headers):
 
 def evaluate_and_rank_with_deepseek(candidates, topic):
     api_key = os.getenv("DEEPSEEK_API_KEY")
-    if not api_key: return candidates[:5]
-    if not candidates: return []
+    if not api_key or not candidates: 
+        return candidates[:3] # 无Key则返回前3
 
-    prompt_text = f"你是一个资深的【{topic}】领域AI研究员与架构师。请评估以下最新ArXiv论文候选列表。\n"
-    prompt_text += "请根据论文的创新性、质量、相关性进行打分(0-100分)，挑选出最优秀的最多 5 篇论文，并针对每一篇进行极度深度的结构化解析。\n\n"
-    prompt_text += "候选论文列表：\n"
+    prompt_text = f"你是一个资深的【{topic}】领域AI研究员。请评估以下最新ArXiv论文。\n"
+    prompt_text += "挑选出最优秀的最多 5 篇，并进行深度解析。如果是自动驾驶、规控、RL相关则优先。\n\n"
     
     for paper in candidates:
         prompt_text += f"ID: {paper['paper_key']} | Title: {paper['title']}\n"
         prompt_text += f"Abstract: {paper['abstract']}\n"
-        prompt_text += f"PDF Text: {paper.get('pdf_text', '')}\n"
-        prompt_text += f"Comments: {paper.get('comments', '')}\n---\n"
+        prompt_text += f"PDF Sample: {paper.get('pdf_text', '')[:500]}\n---\n"
     
     prompt_text += """
-请严格以 JSON 格式输出结果，不要有任何多余的Markdown标记（如```json），格式必须如下。
-注意：【深度解析】部分请务必详尽专业，多用数据和专业术语；但【通俗总结】请务必接地气、说人话。
+严格输出 JSON 格式（不要Markdown代码块包裹），结构如下：
 {
   "top_papers": [
     {
-      "id": "此处填写论文ID",
+      "id": "论文ID",
       "score": 95,
-      "tags": ["Tag1", "Tag2"],
-      "github_link": "提取文本中的GitHub链接，如果没有必须返回 null",
+      "tags": ["核心技术标签"],
+      "github_link": "URL或null",
       "review": {
-        "type": "一句话定性：属于什么类型、主攻哪个细分方向（请详细说明）",
-        "pain_point": "领域痛点：当前行业/算法现存关键问题是什么（请详细阐述前置背景）",
-        "innovation": "核心创新：只讲最本质1~2个技术突破（请详细解释其实现原理）",
-        "comparison": "相关对比：对标哪些经典算法/前人工作，优势在哪（请给出具体的性能指标提升或核心差异）",
-        "scenario": "落地场景：能直接用在机器人/自动驾驶的哪个具体模块或环节",
-        "advice": "跟进建议：是否值得收藏、复现、嵌入现有项目（给出具有行动指导意义的建议）",
-        "layman_summary": "通俗总结：用大白话向非技术老板或外行解释——这帮人到底搞出了个什么牛逼的东西，解决了什么大麻烦？"
+        "type": "方向定性",
+        "pain_point": "解决的痛点",
+        "innovation": "核心创新点",
+        "comparison": "性能对比",
+        "scenario": "应用场景",
+        "advice": "行动建议",
+        "layman_summary": "通俗大白话"
       }
     }
   ]
@@ -130,214 +127,159 @@ def evaluate_and_rank_with_deepseek(candidates, topic):
     payload = {
         "model": "deepseek-chat",
         "messages": [
-            {"role": "system", "content": "你是一个严谨的学术助手。你只输出原生纯合法的 JSON 字符串。"},
+            {"role": "system", "content": "你是一个只输出JSON的严谨学术助手。"},
             {"role": "user", "content": prompt_text}
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0.4 # 提升一点温度，让“通俗总结”部分的语言更生动、更具表达力
+        "temperature": 0.3
     }
 
     try:
-        logging.info(f"🧠 调用 DeepSeek 进行深度解析 {len(candidates)} 篇 [{topic}] 领域论文...")
+        logging.info(f"🧠 AI 正在评审 {len(candidates)} 篇文献...")
         result_json = call_deepseek_api(payload, headers)
         content = result_json['choices'][0]['message']['content']
-        
         ai_evaluations = json.loads(content).get("top_papers", [])
-        final_top_papers = []
-        for ai_eval in sorted(ai_evaluations, key=lambda x: x.get("score", 0), reverse=True):
+        
+        evaluated_papers = []
+        for ai_eval in ai_evaluations:
             for paper in candidates:
                 if paper['paper_key'] == ai_eval.get('id'):
-                    paper['ai_score'] = ai_eval.get('score', 0)
-                    paper['tags'] = ai_eval.get('tags', [])
-                    paper['github_link'] = ai_eval.get('github_link')
-                    paper['review'] = ai_eval.get('review', {})
-                    final_top_papers.append(paper)
+                    paper.update({
+                        'ai_score': ai_eval.get('score', 0),
+                        'tags': ai_eval.get('tags', []),
+                        'github_link': ai_eval.get('github_link'),
+                        'review': ai_eval.get('review', {})
+                    })
+                    evaluated_papers.append(paper)
                     break
-        return final_top_papers
+        return evaluated_papers
     except Exception as e:
-        logging.error(f"❌ DeepSeek 调用或解析在多次重试后仍失败: {e}")
-        return candidates[:5]
+        logging.error(f"❌ AI 评估失败: {e}")
+        return []
 
 # =====================================================================
-# [重构] 飞书富文本推送模块 (加入通俗大白话总结版)
+# 飞书推送模块
 # =====================================================================
 def send_to_feishu(webhook, paper):
     if not webhook: return
     
-    topic = paper.get('topic', '未知领域')
     title = paper['title']
     url = paper['url']
-    ai_score = paper.get('ai_score', 'N/A')
-    tags = paper.get('tags', [])
-    github_link = paper.get('github_link')
     review = paper.get('review', {})
-    
-    tags_str = " ".join([f"**[{t}]**" for t in tags]) if tags else "无"
-    
-    md_content = f"👤 **作者**: {paper['authors']}\n"
-    md_content += f"🏷️ **分类**: {tags_str}\n"
-    if github_link and github_link.lower() != "null":
-        md_content += f"💻 **开源代码**: [{github_link}]({github_link})\n"
-    md_content += f"🔥 **AI 评分**: {ai_score} / 100\n"
-    
-    # 学术硬核深度解析
-    md_content += "\n---\n🔬 **硬核深度解析**\n"
-    r_type = review.get('type', '未提取')
-    r_pain = review.get('pain_point', '未提取')
-    r_inno = review.get('innovation', '未提取')
-    r_comp = review.get('comparison', '未提取')
-    r_scen = review.get('scenario', '未提取')
-    r_adv  = review.get('advice', '未提取')
-    r_layman = review.get('layman_summary', '未提取')
+    tags_str = " ".join([f"**[{t}]**" for t in paper.get('tags', [])])
 
-    md_content += f"**🎯 定性**: {r_type}\n\n"
-    md_content += f"**💢 痛点**: {r_pain}\n\n"
-    md_content += f"**✨ 创新**: {r_inno}\n\n"
-    md_content += f"**📊 对比**: {r_comp}\n\n"
-    md_content += f"**🚗 场景**: {r_scen}\n\n"
-    md_content += f"**📌 建议**: {r_adv}\n"
+    md_content = (
+        f"👤 **作者**: {paper['authors']}\n"
+        f"🏷️ **标签**: {tags_str}\n"
+        f"🔥 **AI 评分**: {paper.get('ai_score', 'N/A')}\n"
+    )
+    if paper.get('github_link') and str(paper['github_link']).lower() != "null":
+        md_content += f"💻 **代码**: [GitHub]({paper['github_link']})\n"
     
-    # 增加通俗白话总结板块
-    md_content += f"\n---\n🗣️ **通俗大白话总结**\n"
-    md_content += f"> *{r_layman}*\n"
-    
-    md_content += f"\n---\n🔗 **原件链接**: [{url}]({url})"
+    md_content += (
+        f"\n---\n"
+        f"**🎯 定性**: {review.get('type','-')}\n"
+        f"**💢 痛点**: {review.get('pain_point','-')}\n"
+        f"**✨ 创新**: {review.get('innovation','-')}\n"
+        f"**🚗 场景**: {review.get('scenario','-')}\n"
+        f"**📌 建议**: {review.get('advice','-')}\n"
+        f"\n---\n"
+        f"🗣️ **通俗总结**: *{review.get('layman_summary','-')}*\n"
+        f"\n🔗 [查看原文]({url})"
+    )
 
     payload = {
         "msg_type": "interactive",
         "card": {
             "config": {"wide_screen_mode": True},
             "header": {
-                "title": {"tag": "plain_text", "content": f"🏆 [全场 Top 5 | {topic}]\n{title[:50]}..."},
-                "template": "blue" if github_link and github_link.lower() != "null" else "wathet" 
+                "title": {"tag": "plain_text", "content": f"🌟 {paper['topic']} Top Pick: {title[:60]}..."},
+                "template": "orange" if paper.get('ai_score', 0) > 90 else "blue"
             },
-            "elements": [
-                {"tag": "markdown", "content": md_content}
-            ]
+            "elements": [{"tag": "markdown", "content": md_content}]
         }
     }
     
     try:
-        r = requests.post(webhook, json=payload, headers={'Content-Type': 'application/json'}, timeout=5)
-        if r.status_code == 200: logging.info(f"✅ 飞书推送成功: {title[:30]}")
+        r = requests.post(webhook, json=payload, timeout=10)
+        r.raise_for_status()
+        logging.info(f"✅ 飞书推送成功: {title[:30]}")
     except Exception as e:
-        logging.error(f"❌ 飞书推送发生异常: {e}")
+        logging.error(f"❌ 飞书推送失败: {e}")
 
 # =====================================================================
-# 核心调度流保持不变，仅在拉取时注入 PDF 解析
+# 业务逻辑流
 # =====================================================================
-def load_config(config_file:str) -> dict:
-    def pretty_filters(**config) -> dict:
-        keywords = dict()
-        def parse_filters(filters:list):
-            return " OR ".join([f'"{f}"' if len(f.split()) > 1 else f for f in filters])
-        for k,v in config['keywords'].items(): keywords[k] = parse_filters(v['filters'])
-        return keywords
-    with open(config_file,'r') as f:
-        config = yaml.load(f,Loader=yaml.FullLoader)
-        config['kv'] = pretty_filters(**config)
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    # 处理关键词逻辑
+    keywords = {}
+    for k, v in config.get('keywords', {}).items():
+        filters = v.get('filters', [])
+        keywords[k] = " OR ".join([f'"{f}"' if " " in f else f for f in filters])
+    config['kv'] = keywords
     return config
 
-def get_authors(authors, first_author=False):
-    return authors[0] if first_author else ", ".join(str(author) for author in authors)
-
-def get_and_evaluate_papers(topic, query, max_results):
+def get_papers(topic, query, max_results):
     client = arxiv.Client()
-    search_engine = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.SubmittedDate)
+    search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.SubmittedDate)
     
-    candidates = []
-    for result in client.results(search_engine):
-        paper_id = result.get_short_id()
-        paper_key = paper_id.split('v')[0]
-        
-        if paper_key in PROCESSED_HISTORY: continue
+    papers = []
+    for result in client.results(search):
+        p_id = result.get_short_id().split('v')[0]
+        if p_id in PROCESSED_HISTORY: continue
         if ONLY_TOP_CONF and not is_top_conf(result.comment): continue
 
-        paper_url = arxiv_url + 'abs/' + paper_key
-        # 下载并提取 PDF 关键文本
+        paper_url = f"http://arxiv.org/abs/{p_id}"
         pdf_text = extract_pdf_core_content(paper_url)
-
-        candidates.append({
+        
+        papers.append({
             'topic': topic,
-            'paper_key': paper_key,
+            'paper_key': p_id,
             'title': result.title,
             'url': paper_url,
             'abstract': result.summary,
             'pdf_text': pdf_text,
-            'authors': get_authors(result.authors),
-            'first_author': get_authors(result.authors, first_author=True),
+            'authors': ", ".join(str(a) for a in result.authors),
+            'first_author': str(result.authors[0]) if result.authors else "Unknown",
             'update_time': str(result.updated.date()),
             'comments': result.comment
         })
-        logging.info(f"📥 提取有效文献: [{paper_key}] {result.title[:30]}...")
+    return papers
 
-    for paper in candidates: PROCESSED_HISTORY.add(paper['paper_key'])
-
-    if candidates: return evaluate_and_rank_with_deepseek(candidates, topic)
-    return []
-
-# （此处省略 update_json_file 和 json_to_md 等无须更改的写库函数，保持上一版的写法即可）
-def update_json_file(filename, data_dict):
-    m = json.loads(open(filename).read()) if os.path.exists(filename) and os.path.getsize(filename) > 0 else {}
-    for data in data_dict:
-        for k, v in data.items():
-            m.setdefault(k, {}).update(v)
-    with open(filename, "w") as f: json.dump(m, f)
-
-def json_to_md(filename, md_filename):
-    data = json.loads(open(filename).read()) if os.path.exists(filename) else {}
-    DateNow = str(datetime.date.today()).replace('-','.')
-    with open(md_filename, "w+") as f:
-        f.write(f"## Updated on {DateNow}\n> Usage instructions: [here](./docs/README.md#usage)\n\n")
-        f.write("<details>\n  <summary>Table of Contents</summary>\n  <ol>\n")
-        for k in data:
-            if data[k]: f.write(f"    <li><a href=#{k.replace(' ','-').lower()}>{k}</a></li>\n")
-        f.write("  </ol>\n</details>\n\n")
-        for k, v in data.items():
-            if not v: continue
-            f.write(f"## {k}\n\n| Publish Date | Title | Authors | PDF | Code |\n|:---------|:-----------------------|:---------|:------|:------|\n")
-            keys = list(v.keys()); keys.sort(reverse=True)
-            for key in keys: f.write(v[key])
-            f.write("\n")
-
-def demo(**config):
-    keywords = config['kv']
-    max_results = config['max_results']
-    global_top_papers = []
-
-    logging.info(f"=== 开始拉取 arXiv 文献并提交 AI 评估 ===")
-    for topic, keyword in keywords.items():
-        logging.info(f"正在处理领域: {topic}")
-        topic_evaluated = get_and_evaluate_papers(topic, keyword, max_results)
-        global_top_papers.extend(topic_evaluated)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_path', type=str, default='config.yaml')
+    args = parser.parse_args()
     
-    global_top_papers.sort(key=lambda x: float(x.get('ai_score', 0)), reverse=True)
-    top_5_to_push = global_top_papers[:5]
-
-    save_history(PROCESSED_HISTORY)
+    check_env()
+    config = load_config(args.config_path)
     webhook = os.getenv("FEISHU_WEBHOOK")
     
-    data_collector = []
-    for topic in keywords.keys():
-        content = dict()
-        for paper in top_5_to_push:
-            if paper['topic'] == topic:
-                if webhook: send_to_feishu(webhook, paper)
-                line = "- {}, **{}**, {} et.al., Paper: [{}]({})".format(
-                   paper['update_time'], paper['title'], paper['first_author'], paper['url'], paper['url'])
-                if paper['comments']: line += f", {paper['comments'].replace(chr(10), ' ')}"
-                content[paper['paper_key']] = line + "\n"
-        data_collector.append({topic: content})
+    all_candidates = []
+    for topic, query in config['kv'].items():
+        logging.info(f"🔍 正在检索领域: {topic}")
+        papers = get_papers(topic, query, config.get('max_results', 10))
+        if papers:
+            # 每个领域单独评估，保证领域内公平
+            evaluated = evaluate_and_rank_with_deepseek(papers, topic)
+            all_candidates.extend(evaluated)
+    
+    # 全局按分数排序
+    all_candidates.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
+    top_picks = all_candidates[:5] # 最终精选 5 篇推送
 
-    if config.get('publish_readme'):
-        json_file = config['json_readme_path']
-        md_file = config['md_readme_path']
-        update_json_file(json_file, data_collector)
-        json_to_md(json_file, md_file)
-        logging.info(f"📚 本地精华仓库更新完毕。")
+    if not top_picks:
+        logging.info("📭 今日无新论文或未通过 AI 筛选。")
+        return
+
+    for paper in top_picks:
+        send_to_feishu(webhook, paper)
+        PROCESSED_HISTORY.add(paper['paper_key'])
+    
+    save_history(PROCESSED_HISTORY)
+    logging.info("🏁 任务完成，历史记录已更新。")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path',type=str, default='config.yaml')
-    args = parser.parse_args()
-    demo(**load_config(args.config_path))
+    main()

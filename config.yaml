@@ -18,53 +18,38 @@ md_readme_path: 'README.md'
 md_gitpage_path: './docs/index.md'
 md_wechat_path: './docs/wechat.md'
 
-# ======= 领域配置 =======
+# ======= 专属核心领域配置 =======
 keywords:
 
   "Robot Navigation":
     filters: [
       "Robot Navigation",
-      "Autonomous Navigation",
-      "Mobile Robot Navigation",
-      "Navigation in Unknown Environments"
+      "Autonomous Navigation"
     ]
 
   "Path Planning":
     filters: [
-      "Path Planning",
       "Motion Planning",
-      "Trajectory Planning",
-      "Graph-based Planning",
-      "Sampling-based Planning"
+      "Path Planning"
     ]
 
   "Planning & Control":
     filters: [
-      "Motion Control",
-      "Trajectory Optimization",
-      "Model Predictive Control",
-      "Optimal Control"
+      "Model Predictive Control"
     ]
 
   "Reinforcement Learning Navigation":
     filters: [
       "Reinforcement Learning",
-      "Deep Reinforcement Learning",
-      "Policy Learning",
-      "RL for Navigation",
-      "Goal-conditioned RL"
+      "RL for Navigation"
     ]
 
   "Decision Making":
     filters: [
-      "Decision Making",
-      "Behavior Planning",
-      "Sequential Decision Making"
+      "Decision Making"
     ]
 
   "Autonomous Driving":
     filters: [
-      "Autonomous Driving",
-      "Motion Planning for Driving",
-      "Behavior Planning for Autonomous Vehicles"
+      "Autonomous Driving"
     ]
