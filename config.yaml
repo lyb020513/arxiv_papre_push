@@ -18,15 +18,53 @@ md_readme_path: 'README.md'
 md_gitpage_path: './docs/index.md'
 md_wechat_path: './docs/wechat.md'
 
-# ======= 专属核心领域配置 =======
+# ======= 领域配置 =======
 keywords:
-  "Robotics":
-    filters: ["Robotics", "Robot Manipulation", "Legged Locomotion", "Human-Robot Interaction"]
-  "Planning and Control":
-    filters: ["Trajectory Planning", "Motion Control", "Model Predictive Control", "Path Planning"]
+
+  "Robot Navigation":
+    filters: [
+      "Robot Navigation",
+      "Autonomous Navigation",
+      "Mobile Robot Navigation",
+      "Navigation in Unknown Environments"
+    ]
+
+  "Path Planning":
+    filters: [
+      "Path Planning",
+      "Motion Planning",
+      "Trajectory Planning",
+      "Graph-based Planning",
+      "Sampling-based Planning"
+    ]
+
+  "Planning & Control":
+    filters: [
+      "Motion Control",
+      "Trajectory Optimization",
+      "Model Predictive Control",
+      "Optimal Control"
+    ]
+
+  "Reinforcement Learning Navigation":
+    filters: [
+      "Reinforcement Learning",
+      "Deep Reinforcement Learning",
+      "Policy Learning",
+      "RL for Navigation",
+      "Goal-conditioned RL"
+    ]
+
   "Decision Making":
-    filters: ["Decision Making", "Behavior Planning", "Motion Planning"]
-  "Reinforcement Learning":
-    filters: ["Reinforcement Learning", "Deep Reinforcement Learning", "Proximal Policy Optimization", "Q-Learning"]
+    filters: [
+      "Decision Making",
+      "Behavior Planning",
+      "Sequential Decision Making"
+    ]
+
   "Autonomous Driving":
-    filters: ["Autonomous Driving", "Self-driving", "Autonomous Vehicles"]
+    filters: [
+      "Autonomous Driving",
+      "Motion Planning for Driving",
+      "Behavior Planning for Autonomous Vehicles"
+    ]
