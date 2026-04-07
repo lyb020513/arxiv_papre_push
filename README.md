@@ -1,4 +1,4 @@
-## Updated on 2026.04.06
+## Updated on 2026.04.07
 > Usage instructions: [here](./docs/README.md#usage)
 
 <details>
@@ -12,6 +12,7 @@
     <li><a href=#nerf>NeRF</a></li>
     <li><a href=#robotics>Robotics</a></li>
     <li><a href=#planning-and-control>Planning and Control</a></li>
+    <li><a href=#decision-making>Decision Making</a></li>
     <li><a href=#reinforcement-learning>Reinforcement Learning</a></li>
     <li><a href=#autonomous-driving>Autonomous Driving</a></li>
   </ol>
@@ -9154,6 +9155,7 @@
 
 | Publish Date | Title | Authors | PDF | Code |
 |:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-06, **DHFP-PE: Dual-Precision Hybrid Floating Point Processing Element for AI Acceleration**, Shubham Kumar et.al., Paper: [http://arxiv.org/abs/2604.04507](http://arxiv.org/abs/2604.04507), Accepted in ANRF-sponsored 2nd International Conference on Next Generation Electronics (NEleX-2026)
 - 2026-04-03, **Learning Task-Invariant Properties via Dreamer: Enabling Efficient Policy Transfer for Quadruped Robots**, Junyang Liang et.al., Paper: [http://arxiv.org/abs/2604.02911](http://arxiv.org/abs/2604.02911), Accepted by IEEE International Conference on Robotics and Automation (ICRA) 2026
 - 2026-04-02, **Ego-Grounding for Personalized Question-Answering in Egocentric Videos**, Junbin Xiao et.al., Paper: [http://arxiv.org/abs/2604.01966](http://arxiv.org/abs/2604.01966), To appear at CVPR'26
 
@@ -9161,10 +9163,17 @@
 
 | Publish Date | Title | Authors | PDF | Code |
 |:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-04, **SymphoMotion: Joint Control of Camera Motion and Object Dynamics for Coherent Video Generation**, Guiyu Zhang et.al., Paper: [http://arxiv.org/abs/2604.03723](http://arxiv.org/abs/2604.03723), CVPR 2026
 - 2026-04-02, **Cooperative Detour Planning for Dual-Task Drone Fleets**, Pengbo Zhu et.al., Paper: [http://arxiv.org/abs/2604.02471](http://arxiv.org/abs/2604.02471), Submitted to the 65th IEEE Conference on Decision and Control (CDC 2026)
 - 2026-04-02, **Audio Spatially-Guided Fusion for Audio-Visual Navigation**, Xinyu Zhou et.al., Paper: [http://arxiv.org/abs/2604.02389](http://arxiv.org/abs/2604.02389), Main paper (6 pages). Accepted for publication by the International Joint Conference on Neural Networks (IJCNN 2026)
 - 2026-04-02, **DynaVid: Learning to Generate Highly Dynamic Videos using Synthetic Motion Data**, Wonjoon Jin et.al., Paper: [http://arxiv.org/abs/2604.01666](http://arxiv.org/abs/2604.01666), Accepted to CVPR 2026. Website: https://jinwonjoon.github.io/DynaVid/
 - 2026-04-01, **Tube-Based Safety for Anticipative Tracking in Multi-Agent Systems**, Armel Koulong et.al., Paper: [http://arxiv.org/abs/2604.00992](http://arxiv.org/abs/2604.00992), This work has been submitted to the 65th IEEE Conference on Decision and Control for possible publication
+
+## Decision Making
+
+| Publish Date | Title | Authors | PDF | Code |
+|:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-06, **Don't Waste Bits! Adaptive KV-Cache Quantization for Lightweight On-Device LLMs**, Sayed Pedram Haeri Boroujeni et.al., Paper: [http://arxiv.org/abs/2604.04722](http://arxiv.org/abs/2604.04722), Accepted by the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) 2026
 
 ## Reinforcement Learning
 
@@ -9176,6 +9185,8 @@
 
 | Publish Date | Title | Authors | PDF | Code |
 |:---------|:-----------------------|:---------|:------|:------|
+- 2026-04-06, **HorizonWeaver: Generalizable Multi-Level Semantic Editing for Driving Scenes**, Mauricio Soroco et.al., Paper: [http://arxiv.org/abs/2604.04887](http://arxiv.org/abs/2604.04887), CVPR Findings 2026
+- 2026-04-06, **The Blind Spot of Adaptation: Quantifying and Mitigating Forgetting in Fine-tuned Driving Models**, Runhao Mao et.al., Paper: [http://arxiv.org/abs/2604.04857](http://arxiv.org/abs/2604.04857), received by cvpr2026
 - 2026-04-03, **Rascene: High-Fidelity 3D Scene Imaging with mmWave Communication Signals**, Kunzhe Song et.al., Paper: [http://arxiv.org/abs/2604.02603](http://arxiv.org/abs/2604.02603), Accepted to CVPR 2026
 - 2026-04-02, **PTC-Depth: Pose-Refined Monocular Depth Estimation with Temporal Consistency**, Leezy Han et.al., Paper: [http://arxiv.org/abs/2604.01791](http://arxiv.org/abs/2604.01791), Accepted at CVPR 2026
 - 2026-04-01, **Efficient Equivariant Transformer for Self-Driving Agent Modeling**, Scott Xu et.al., Paper: [http://arxiv.org/abs/2604.01466](http://arxiv.org/abs/2604.01466), CVPR 2026
